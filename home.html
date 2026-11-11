@@ -48,4 +48,37 @@ function showLogin(){current=null;$('hubWrap').hidden=true;$('loginScreen').hidd
 $('loginForm').onsubmit=e=>{e.preventDefault();const u=$('loginUser').value.trim().toLowerCase(),p=$('loginPass').value;const account=[...ACCOUNTS,ADMIN].find(a=>a.username===u&&a.password===p);if(!account){$('loginError').textContent='Incorrect username or password.';return}try{sessionStorage.setItem('christmas-event-user',u)}catch(e){}showHub(u)};
 $('logoutButton').onclick=()=>{try{sessionStorage.removeItem('christmas-event-user')}catch(e){}showLogin()};
 try{const saved=sessionStorage.getItem('christmas-event-user');if([...ACCOUNTS,ADMIN].some(a=>a.username===saved))showHub(saved);else showLogin()}catch(e){showLogin()}
+</script><script type="module">
+import {initializeApp} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js';
+import {getAuth,signInAnonymously,onAuthStateChanged} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js';
+import {getFirestore,collection,onSnapshot} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js';
+const firebaseConfig={
+apiKey:"AIzaSyBf7kdw3RNZ9qHBT0aZf50rPfKy-jO816w",
+authDomain:"perplex-mas-inventory.firebaseapp.com",
+projectId:"perplex-mas-inventory",
+appId:"1:166635295684:web:33ef3b6e0687356ca28a91"
+};
+const items=document.getElementById('inventoryItems');
+const status=document.getElementById('inventoryMessage');
+function renderInventory(docs){
+ items.replaceChildren();
+ if(!docs.length){items.innerHTML='<div class="inventory-empty"><div style="font-size:38px">🎒</div><strong>Your inventory is empty</strong><span>Discover items throughout Perplex-Mas to fill your inventory.</span></div>';return}
+ const list=document.createElement('div');list.style.display='grid';list.style.gap='12px';
+ for(const snap of docs){const data=snap.data();if(data.placeholder===true)continue;
+ const card=document.createElement('article');card.className='card';card.style.minHeight='0';
+ const title=document.createElement('h3');title.textContent=data.name||'Discovered item';
+ const desc=document.createElement('p');desc.textContent=data.description||'';
+ card.append(title,desc);if(data.imageUrl&&/^https:\/\//.test(data.imageUrl)){const img=document.createElement('img');img.src=data.imageUrl;img.alt='';img.loading='lazy';img.style.maxWidth='100%';img.style.borderRadius='10px';card.prepend(img)}
+ list.append(card)}
+ if(!list.children.length){items.innerHTML='<div class="inventory-empty"><strong>Your inventory is empty</strong><span>Discover items throughout Perplex-Mas to fill your inventory.</span></div>'}else items.append(list);
+}
+try{
+ const app=initializeApp(firebaseConfig);
+ const auth=getAuth(app),db=getFirestore(app);
+ let subscribed=false;
+ onAuthStateChanged(auth,user=>{if(!user||subscribed)return;subscribed=true;
+ onSnapshot(collection(db,'inventory_unlocked'),snap=>{renderInventory(snap.docs);status.textContent='Inventory synchronized.'},err=>{status.textContent='Unable to load shared inventory: '+err.message});
+ });
+ await signInAnonymously(auth);
+}catch(err){status.textContent='Firebase connection error: '+err.message;console.error(err)}
 </script></body></html>
