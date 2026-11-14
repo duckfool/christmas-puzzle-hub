@@ -54,7 +54,7 @@ async function loadSharedInventory(){
  const items=document.getElementById('inventoryItems');
  const status=document.getElementById('inventoryMessage');
  try{
-  const response=await fetch(INVENTORY_API+'/inventory',{cache:'no-store'});
+  const response=await fetch(INVENTORY_API+'/shared-inventory',{cache:'no-store'});
   if(!response.ok)throw new Error('HTTP '+response.status);
   const data=await response.json();
   if(!Array.isArray(data.items))throw new Error('Unexpected inventory response');
