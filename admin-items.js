@@ -11,9 +11,21 @@ function card(item){
  const desc=document.createElement('p');desc.textContent=item.description||'No description';
  const meta=document.createElement('p');meta.textContent='Maximum ×'+item.max_quantity+' · '+(item.stackable?'Stackable':'Not stackable')+' · '+(item.craftable?'Crafting material':'Not crafting material');
  const edit=document.createElement('button');edit.type='button';edit.textContent='Edit item';edit.addEventListener('click',()=>openEdit(item));
- el.append(title,meta,desc,edit);
+ const remove=document.createElement('button');remove.type='button';remove.textContent='Remove item';remove.style.background='#e5a7a0';remove.addEventListener('click',()=>removeItem(item,remove));
+ el.append(title,meta,desc,edit,remove);
  if(item.image_url){const img=document.createElement('img');img.src=item.image_url;img.alt=item.name;img.style.cssText='max-width:100%;height:130px;object-fit:contain';el.prepend(img)}
  return el;
+}
+async function removeItem(item,button){
+ const answer=window.prompt('Permanently remove '+item.name+'? Type DELETE to confirm. This cannot be undone.');
+ if(answer!=='DELETE')return;
+ button.disabled=true;msg.textContent='Removing '+item.name+'...';
+ try{
+  const res=await fetch(API,{method:'DELETE',headers:{...auth(),'Content-Type':'application/json'},body:JSON.stringify({item_id:item.item_id})});
+  const data=await res.json();if(!res.ok)throw Error(data.error||'Unable to remove item');
+  if($('itemCreateForm').dataset.mode==='edit'&&$('itemId').value===item.item_id)resetForm();
+  await refresh();msg.textContent='Removed '+item.name+'.';
+ }catch(e){msg.textContent=e.message}finally{button.disabled=false}
 }
 function openEdit(item){
  $('itemCreateForm').hidden=false;$('addItemButton').hidden=true;
