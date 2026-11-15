@@ -80,4 +80,40 @@ async function loadSharedInventory(){
  }catch(error){status.textContent='Unable to load shared inventory. Please try again.';console.error(error)}
 }
 document.getElementById('inventoryLaunch').addEventListener('click',loadSharedInventory);
+const QR_TOKEN_PATTERN=/^[A-Za-z0-9_-]{32,128}$/;
+const qrLinkToken=new URLSearchParams(window.location.search).get('qr');
+if(qrLinkToken){
+ if(QR_TOKEN_PATTERN.test(qrLinkToken)){
+  const showQrConfirmation=()=>{
+   if(document.getElementById('hubWrap').hidden)return;
+   if(document.getElementById('qrConfirm'))return;
+   const panel=document.createElement('div');panel.id='qrConfirm';panel.className='card';panel.style.margin='12px 0';
+   const heading=document.createElement('strong');heading.textContent='QR item discovered';
+   const note=document.createElement('p');note.textContent='Unlock this item for the entire group?';
+   const confirm=document.createElement('button');confirm.type='button';confirm.className='action';confirm.textContent='Unlock QR item';
+   const cancel=document.createElement('button');cancel.type='button';cancel.className='action secondary';cancel.textContent='Not now';cancel.style.marginLeft='8px';
+   const message=document.createElement('p');message.setAttribute('role','status');
+   const clearLink=()=>{const url=new URL(location.href);url.searchParams.delete('qr');history.replaceState(null,'',url)};
+   cancel.onclick=()=>{clearLink();panel.remove()};
+   confirm.onclick=async()=>{
+    confirm.disabled=true;message.textContent='Unlocking...';
+    try{
+     const response=await fetch(INVENTORY_API+'/unlock',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({qr_token:qrLinkToken})});
+     const data=await response.json();
+     if(!response.ok)throw Error(data.error||'Unlock failed');
+     clearLink();panel.remove();document.getElementById('inventoryLaunch').click();
+     document.getElementById('inventoryMessage').textContent=data.newly_unlocked?'QR item unlocked for everyone!':'This item is already unlocked.';
+    }catch(error){message.textContent=error.message;confirm.disabled=false}
+   };
+   panel.append(heading,note,confirm,cancel,message);
+   document.getElementById('hubWrap').prepend(panel);
+  };
+  const loginForm=document.getElementById('loginForm');
+  loginForm.addEventListener('submit',()=>setTimeout(showQrConfirmation,0));
+  showQrConfirmation();
+ }else{
+  console.warn('Invalid QR link token format');
+ }
+}
+
 </script></body></html>
