@@ -55,9 +55,15 @@
       status.textContent='Point your camera at a Perplex-Mas QR code.';
     }catch(e){console.error(e);await closeScanner();status.textContent='Camera unavailable. Use your phone camera to scan the QR link.'}
   }
-  document.addEventListener('DOMContentLoaded',()=>{
+  function initializeScannerButton(){
     const button=$('inventoryScan');
     if(button)button.onclick=startScanner;
-    const close=$('inventoryClose');if(close)close.addEventListener('click',closeScanner);
-  });
+    const close=$('inventoryClose');
+    if(close)close.addEventListener('click',closeScanner);
+  }
+  if(document.readyState==='loading'){
+    document.addEventListener('DOMContentLoaded',initializeScannerButton,{once:true});
+  }else{
+    initializeScannerButton();
+  }
 })();
