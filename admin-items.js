@@ -10,9 +10,26 @@ function card(item){
  const title=document.createElement('h3');title.textContent=item.name;
  const desc=document.createElement('p');desc.textContent=item.description||'No description';
  const meta=document.createElement('p');meta.textContent='Maximum ×'+item.max_quantity+' · '+(item.stackable?'Stackable':'Not stackable')+' · '+(item.craftable?'Crafting material':'Not crafting material');
- el.append(title,meta,desc);
+ const edit=document.createElement('button');edit.type='button';edit.textContent='Edit item';edit.addEventListener('click',()=>openEdit(item));
+ el.append(title,meta,desc,edit);
  if(item.image_url){const img=document.createElement('img');img.src=item.image_url;img.alt=item.name;img.style.cssText='max-width:100%;height:130px;object-fit:contain';el.prepend(img)}
  return el;
+}
+function openEdit(item){
+ $('itemCreateForm').hidden=false;$('addItemButton').hidden=true;
+ $('itemFormHeading').textContent='Edit item';$('saveItemButton').textContent='Save changes';
+ $('itemId').value=item.item_id;$('itemId').readOnly=true;$('itemId').dataset.edited='true';
+ $('itemName').value=item.name;$('itemDescription').value=item.description||'';
+ $('itemImageUrl').value=item.image_url||'';$('itemQuantity').value=item.max_quantity;
+ $('itemStackable').checked=Boolean(item.stackable);$('itemCraftable').checked=Boolean(item.craftable);
+ $('itemCreateForm').dataset.mode='edit';
+ $('itemCreateForm').scrollIntoView({behavior:'smooth',block:'start'});
+}
+function resetForm(){
+ $('itemCreateForm').reset();$('itemCreateForm').hidden=true;$('addItemButton').hidden=false;
+ $('itemCreateForm').dataset.mode='create';$('itemId').readOnly=false;
+ delete $('itemId').dataset.edited;$('itemFormHeading').textContent='Create an item';
+ $('saveItemButton').textContent='Save item';
 }
 async function refresh(){
  msg.textContent='Loading items...';
@@ -24,8 +41,8 @@ async function refresh(){
   msg.textContent=(data.items||[]).length+' saved item types';
  }catch(e){msg.textContent=e.message}
 }
-$('addItemButton').addEventListener('click',()=>{$('itemCreateForm').hidden=false;$('addItemButton').hidden=true});
-$('cancelItemButton').addEventListener('click',()=>{$('itemCreateForm').hidden=true;$('addItemButton').hidden=false});
+$('addItemButton').addEventListener('click',()=>{resetForm();$('itemCreateForm').hidden=false;$('addItemButton').hidden=true});
+$('cancelItemButton').addEventListener('click',resetForm);
 $('refreshItemsButton').addEventListener('click',refresh);
 $('itemName').addEventListener('input',()=>{
  const slug=$('itemName').value.toLowerCase().trim().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'').slice(0,64);
@@ -34,12 +51,13 @@ $('itemName').addEventListener('input',()=>{
 $('itemId').addEventListener('input',()=>{$('itemId').dataset.edited='true'});
 $('itemCreateForm').addEventListener('submit',async e=>{
  e.preventDefault();const button=$('saveItemButton');button.disabled=true;msg.textContent='Saving item...';
+ const editing=$('itemCreateForm').dataset.mode==='edit';
  const item={item_id:$('itemId').value.trim(),name:$('itemName').value.trim(),description:$('itemDescription').value.trim(),image_url:$('itemImageUrl').value.trim(),max_quantity:Number($('itemQuantity').value),stackable:$('itemStackable').checked,craftable:$('itemCraftable').checked};
  try{
-  const res=await fetch(API,{method:'POST',headers:{...auth(),'Content-Type':'application/json'},body:JSON.stringify(item)});
+  const res=await fetch(API,{method:editing?'PUT':'POST',headers:{...auth(),'Content-Type':'application/json'},body:JSON.stringify(item)});
   const data=await res.json();if(!res.ok)throw Error(data.error||'Could not save item');
-  $('itemCreateForm').reset();delete $('itemId').dataset.edited;$('itemCreateForm').hidden=true;$('addItemButton').hidden=false;
-  await refresh();msg.textContent='Saved '+item.name+'.';
+  resetForm();
+  await refresh();msg.textContent=(editing?'Updated ':'Saved ')+item.name+'.';
  }catch(e){msg.textContent=e.message}finally{button.disabled=false}
 });
 document.addEventListener('perplex-admin-ready',refresh);
