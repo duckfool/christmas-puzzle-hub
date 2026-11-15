@@ -11,7 +11,7 @@ async function verify(secret){
  if(!response.ok)throw Error('Admin secret not accepted ('+response.status+').');
  const data=await response.json();if(data.authenticated!==true)throw Error('Authentication failed');
 }
-function showManager(){gate.hidden=true;manager.hidden=false}
+function showManager(){gate.hidden=true;manager.hidden=false;document.dispatchEvent(new Event("perplex-admin-ready"))}
 function showGate(){gate.hidden=false;manager.hidden=true}
 form.addEventListener('submit',async e=>{
  e.preventDefault();const secret=input.value.trim();if(!secret)return;
