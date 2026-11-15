@@ -1,7 +1,9 @@
 (function(){
 'use strict';
 const API='https://perplex-mas-inventory-api.duckfoolomw.workers.dev/admin/items';
+const INVENTORY_API='https://perplex-mas-inventory-api.duckfoolomw.workers.dev/admin/inventory';
 const KEY='perplex-mas-admin-token';
+let inventoryById=new Map();
 const $=id=>document.getElementById(id);
 const msg=$('itemManagerStatus'),grid=$('itemCatalog');
 function auth(){return {'Authorization':'Bearer '+sessionStorage.getItem(KEY)}}
@@ -12,9 +14,29 @@ function card(item){
  const meta=document.createElement('p');meta.textContent='Maximum ×'+item.max_quantity+' · '+(item.stackable?'Stackable':'Not stackable')+' · '+(item.craftable?'Crafting material':'Not crafting material');
  const edit=document.createElement('button');edit.type='button';edit.textContent='Edit item';edit.addEventListener('click',()=>openEdit(item));
  const remove=document.createElement('button');remove.type='button';remove.textContent='Remove item';remove.style.background='#e5a7a0';remove.addEventListener('click',()=>removeItem(item,remove));
- el.append(title,meta,desc,edit,remove);
+ const qty=inventoryById.get(item.item_id);
+ const inventory=document.createElement('div');
+ if(qty===undefined){inventory.textContent='Inventory quantity unavailable';}
+ else {
+  const count=document.createElement('p');count.textContent='Discovered: '+qty+' / '+item.max_quantity;
+  const lock=document.createElement('button');lock.type='button';lock.textContent='− Lock one';lock.disabled=qty<=0;
+  const unlock=document.createElement('button');unlock.type='button';unlock.textContent='+ Unlock one';unlock.disabled=qty>=item.max_quantity;
+  lock.addEventListener('click',()=>setQuantity(item,qty-1,lock,unlock));
+  unlock.addEventListener('click',()=>setQuantity(item,qty+1,lock,unlock));
+  inventory.append(count,lock,unlock);
+ }
+ el.append(title,meta,desc,inventory,edit,remove);
  if(item.image_url){const img=document.createElement('img');img.src=item.image_url;img.alt=item.name;img.style.cssText='max-width:100%;height:130px;object-fit:contain';el.prepend(img)}
  return el;
+}
+async function setQuantity(item,quantity,...buttons){
+ buttons.forEach(b=>b.disabled=true);
+ msg.textContent='Updating '+item.name+'...';
+ try{
+  const res=await fetch(INVENTORY_API,{method:'PUT',headers:{...auth(),'Content-Type':'application/json'},body:JSON.stringify({item_id:item.item_id,quantity})});
+  const data=await res.json();if(!res.ok)throw Error(data.error||'Unable to update quantity');
+  await refresh();msg.textContent=item.name+' quantity updated to '+quantity+'.';
+ }catch(e){msg.textContent=e.message;buttons.forEach(b=>b.disabled=false)}
 }
 async function removeItem(item,button){
  const answer=window.prompt('Permanently remove '+item.name+'? Type DELETE to confirm. This cannot be undone.');
@@ -48,9 +70,16 @@ async function refresh(){
  try{
   const res=await fetch(API,{headers:auth(),cache:'no-store'});const data=await res.json();
   if(!res.ok)throw Error(data.error||'Unable to load items');
+  let inventoryError='';
+  try{
+   const invRes=await fetch(INVENTORY_API,{headers:auth(),cache:'no-store'});
+   const invData=await invRes.json();
+   if(!invRes.ok)throw Error(invData.error||'Inventory request failed');
+   inventoryById=new Map((invData.items||[]).map(x=>[x.item_id,Number(x.quantity)]));
+  }catch(e){inventoryById=new Map();inventoryError=' — quantities unavailable: '+e.message}
   grid.replaceChildren();
   for(const item of data.items||[])grid.append(card(item));
-  msg.textContent=(data.items||[]).length+' saved item types';
+  msg.textContent=(data.items||[]).length+' saved item types'+inventoryError;
  }catch(e){msg.textContent=e.message}
 }
 $('addItemButton').addEventListener('click',()=>{resetForm();$('itemCreateForm').hidden=false;$('addItemButton').hidden=true});
