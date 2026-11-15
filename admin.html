@@ -5,7 +5,7 @@
 <section id="adminAuthGate" class="notice"><h2>Administrator verification</h2><p>Enter the ADMIN_SECRET saved in Cloudflare. It will be kept only for this browser session.</p><form id="adminAuthForm"><label for="adminSecretInput">Admin secret</label><input id="adminSecretInput" type="password" autocomplete="off" required><button type="submit">Unlock Item Manager</button></form><p id="adminAuthMessage" role="status"></p></section><section id="adminManagerContent" hidden><button id="adminSignOut" type="button">Sign out of Admin Manager</button><div class="notice"><strong>Live item catalog</strong><p>Item definitions are saved to Cloudflare. Adding an item does not unlock it for players. Lock, unlock, and reset actions are coming next.</p></div>
 <div class="toolbar"><button id="addItemButton" type="button">+ Add new item</button><button id="refreshItemsButton" type="button">Refresh items</button><button disabled>Reset all discoveries</button><button disabled>Lock all items</button></div>
 <form id="itemCreateForm" class="card" hidden>
-<h2>Create an item</h2>
+<h2 id="itemFormHeading">Create an item</h2>
 <label>Name <input id="itemName" maxlength="100" required></label>
 <label>Item ID <input id="itemId" maxlength="64" pattern="[a-z0-9_]+" required></label>
 <label>Description <input id="itemDescription" maxlength="2000"></label>
@@ -16,4 +16,4 @@
 <button id="saveItemButton" type="submit">Save item</button><button id="cancelItemButton" type="button">Cancel</button>
 </form>
 <p id="itemManagerStatus" role="status">Loading saved items...</p><div id="itemCatalog" class="grid"></div>
-</section><script src="admin-items.js?v=1"></script><script src="admin-auth.js?v=2"></script></body></html>
+</section><script src="admin-items.js?v=2"></script><script src="admin-auth.js?v=2"></script></body></html>
