@@ -1,4 +1,4 @@
-/* Perplex-Mas QR scanner v14: ZXing decoder diagnostics */
+/* Perplex-Mas QR scanner v15: ZXing decoder diagnostics */
 (function(){
 'use strict';
 const $=id=>document.getElementById(id);
@@ -28,6 +28,14 @@ async function redeem(scanned){
  try{
   const link=new URL(scanned);
   if(link.origin===location.origin&&link.pathname.endsWith('/home.html'))token=link.searchParams.get('qr');
+  else if(link.origin===location.origin&&link.pathname.endsWith('/r.html')){
+   const q=link.searchParams.get('q')||'';
+   if(q.startsWith('h_')){
+    const raw=q.slice(2).replace(/-/g,'+').replace(/_/g,'/');
+    const bytes=atob(raw.padEnd(Math.ceil(raw.length/4)*4,'='));
+    token=Array.from(bytes,c=>c.charCodeAt(0).toString(16).padStart(2,'0')).join('');
+   }else token=q;
+  }
  }catch(e){}
  if(!token||!/^[A-Za-z0-9_-]{32,128}$/.test(token)){
   status.textContent='QR detected, but it is not a valid Perplex-Mas item link.';
@@ -84,7 +92,7 @@ async function startScanner(){
  const close=document.createElement('button');close.type='button';close.className='action secondary';close.textContent='Close scanner';
  close.onclick=async()=>{await closeScanner();status.textContent='Scanner closed.'};
  panel.append(indicator,viewer,close);$('inventoryClaimForm').append(panel);
- status.textContent='Loading ZXing scanner v14...';
+ status.textContent='Loading ZXing scanner v15...';
  try{
   await loadZXing();
   const hints=new Map();
@@ -110,10 +118,10 @@ async function startScanner(){
    }
    if(attempts===1||attempts%5===0){
     indicator.textContent='● Searching for QR code… '+attempts+' attempts';
-    status.textContent='ZXing v14: '+attempts+' scans, '+video.videoWidth+'×'+video.videoHeight+', errors: '+unexpected+'.';
+    status.textContent='ZXing v15: '+attempts+' scans, '+video.videoWidth+'×'+video.videoHeight+', errors: '+unexpected+'.';
    }
   });
-  if(!detected&&attempts===0){status.textContent='ZXing v14 ready; waiting for first scan...';indicator.textContent='● Searching for QR code…'}
+  if(!detected&&attempts===0){status.textContent='ZXing v15 ready; waiting for first scan...';indicator.textContent='● Searching for QR code…'}
  }catch(e){console.error(e);await closeScanner();status.textContent='ZXing error: '+(e.message||String(e))}
  finally{starting=false}
 }
