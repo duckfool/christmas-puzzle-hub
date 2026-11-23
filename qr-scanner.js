@@ -74,24 +74,32 @@ async function startScanner(){
   const canvas=document.createElement('canvas');
   const ctx=canvas.getContext('2d',{willReadFrequently:true});
   let last=0,frames=0,errors=0,ticks=0;
-  function scan(now){
+  let nativeDetector=null;
+  if('BarcodeDetector' in window){try{nativeDetector=new BarcodeDetector({formats:['qr_code']})}catch(e){console.warn('Native QR detector unavailable',e)}}
+  async function scan(now){
    if(!active)return;
    ticks++;
-   if(ticks===1)status.textContent='Diagnostic v8: camera loop started.';
+   if(ticks===1)status.textContent='Scanner v9: camera loop started.';
    frame=requestAnimationFrame(scan);
    if(busy||detecting||now-last<120||video.readyState<2)return;
    last=now;detecting=true;
    try{
     const w=video.videoWidth,h=video.videoHeight;
     if(!w||!h)return;
-    const scale=Math.min(1,960/Math.max(w,h));
-    canvas.width=Math.round(w*scale);canvas.height=Math.round(h*scale);
+    canvas.width=w;canvas.height=h;
     ctx.drawImage(video,0,0,canvas.width,canvas.height);
-    const pixels=ctx.getImageData(0,0,canvas.width,canvas.height);
     frames++;
-    status.textContent='Diagnostic v8: '+frames+' frames checked ('+canvas.width+'×'+canvas.height+'), errors: '+errors+'.';
+    if(nativeDetector){
+     try{
+      const codes=await nativeDetector.detect(video);
+      if(codes.length&&codes[0].rawValue){busy=true;await redeem(codes[0].rawValue);return}
+     }catch(e){nativeDetector=null;console.warn('Native QR detection failed; using jsQR',e)}
+    }
+    if(!active||busy)return;
+    const pixels=ctx.getImageData(0,0,canvas.width,canvas.height);
+    status.textContent='Scanner v9: '+frames+' frames checked ('+canvas.width+'×'+canvas.height+'), '+(nativeDetector?'native + jsQR':'jsQR')+', errors: '+errors+'.';
     const result=window.jsQR(pixels.data,canvas.width,canvas.height,{inversionAttempts:'attemptBoth'});
-    if(result?.data){busy=true;redeem(result.data)}
+    if(result?.data){busy=true;await redeem(result.data)}
    }catch(e){errors++;console.error('QR frame scan:',e);status.textContent='QR processing error: '+(e.message||String(e))}
    finally{detecting=false}
   }
