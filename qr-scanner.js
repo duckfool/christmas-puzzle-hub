@@ -1,70 +1,106 @@
-/* Perplex-Mas QR camera scanner. Existing QR links remain supported. */
+/* Perplex-Mas scanner using jsQR and direct camera frames. */
 (function(){
-  'use strict';
-  let scanner=null, busy=false;
-  const $=id=>document.getElementById(id);
-  async function closeScanner(){
-    const active=scanner;scanner=null;
-    if(active){try{await active.stop()}catch(e){}try{active.clear()}catch(e){}}
-    const panel=$('perplexQrCamera');if(panel)panel.remove();
+'use strict';
+const $=id=>document.getElementById(id);
+const API='https://perplex-mas-inventory-api.duckfoolomw.workers.dev';
+let stream=null,video=null,frame=0,active=false,busy=false,detecting=false;
+async function closeScanner(){
+ active=false;
+ if(frame)cancelAnimationFrame(frame);
+ frame=0;
+ if(stream){stream.getTracks().forEach(t=>t.stop());stream=null}
+ if(video){video.pause();video.srcObject=null;video=null}
+ $('perplexQrCamera')?.remove();
+}
+function loadDecoder(){
+ if(window.jsQR)return Promise.resolve();
+ return new Promise((resolve,reject)=>{
+  const s=document.createElement('script');
+  s.src='https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js';
+  s.onload=()=>window.jsQR?resolve():reject(new Error('QR decoder unavailable'));
+  s.onerror=()=>reject(new Error('QR decoder could not load'));
+  document.head.appendChild(s);
+ });
+}
+async function redeem(scanned){
+ const status=$('inventoryMessage');
+ status.textContent='QR detected. Checking Perplex-Mas link...';
+ let token=null;
+ try{
+  const link=new URL(scanned);
+  if(link.origin===location.origin&&/(?:^|\/)home\.html$/.test(link.pathname))token=link.searchParams.get('qr');
+ }catch(e){}
+ if(!token||!/^[A-Za-z0-9_-]{32,128}$/.test(token)){
+  status.textContent='QR detected, but it is not a valid Perplex-Mas item link.';
+  busy=false;return;
+ }
+ await closeScanner();
+ if(!window.confirm('QR item discovered. Unlock for everyone?')){
+  status.textContent='Unlock canceled.';busy=false;return;
+ }
+ status.textContent='Unlocking item...';
+ try{
+  const response=await fetch(API+'/redeem-discovery',{
+   method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({qr_token:token})
+  });
+  const data=await response.json();
+  if(!response.ok)throw Error(data.error||'Unlock failed');
+  await window.loadSharedInventory();
+  status.textContent=data.newly_unlocked?'QR item unlocked for everyone!':'Item already unlocked.';
+ }catch(e){status.textContent=e.message||'Unable to unlock item.'}
+ busy=false;
+}
+async function startScanner(){
+ const status=$('inventoryMessage');
+ if(active){await closeScanner();status.textContent='Scanner closed.';return}
+ if(busy)return;
+ const panel=document.createElement('div');panel.id='perplexQrCamera';panel.style.marginTop='12px';
+ video=document.createElement('video');
+ video.setAttribute('playsinline','');video.muted=true;video.autoplay=true;
+ video.style.cssText='width:100%;max-width:480px;border-radius:12px;background:#111;display:block';
+ const close=document.createElement('button');close.type='button';close.className='action secondary';close.textContent='Close scanner';
+ close.onclick=()=>{closeScanner();status.textContent='Scanner closed.'};
+ panel.append(video,close);$('inventoryClaimForm').append(panel);
+ status.textContent='Starting camera and QR decoder...';
+ try{
+  await loadDecoder();
+  stream=await navigator.mediaDevices.getUserMedia({
+   audio:false,video:{facingMode:{ideal:'environment'},width:{ideal:1280},height:{ideal:720}}
+  });
+  video.srcObject=stream;
+  await video.play();
+  active=true;
+  status.textContent='Point your camera at a Perplex-Mas QR code (new scanner).';
+  const canvas=document.createElement('canvas');
+  const ctx=canvas.getContext('2d',{willReadFrequently:true});
+  let last=0;
+  function scan(now){
+   if(!active)return;
+   frame=requestAnimationFrame(scan);
+   if(busy||detecting||now-last<120||video.readyState<2)return;
+   last=now;detecting=true;
+   try{
+    const w=video.videoWidth,h=video.videoHeight;
+    if(!w||!h)return;
+    const scale=Math.min(1,960/Math.max(w,h));
+    canvas.width=Math.round(w*scale);canvas.height=Math.round(h*scale);
+    ctx.drawImage(video,0,0,canvas.width,canvas.height);
+    const pixels=ctx.getImageData(0,0,canvas.width,canvas.height);
+    const result=window.jsQR(pixels.data,canvas.width,canvas.height,{inversionAttempts:'attemptBoth'});
+    if(result?.data){busy=true;redeem(result.data)}
+   }catch(e){console.error('QR frame scan:',e)}
+   finally{detecting=false}
   }
-  async function loadLibrary(){
-    if(window.Html5Qrcode)return;
-    await new Promise((resolve,reject)=>{
-      const script=document.createElement('script');
-      script.src='https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js';
-      script.onload=resolve;script.onerror=()=>reject(new Error('Scanner library could not load'));
-      document.head.appendChild(script);
-    });
-  }
-  async function startScanner(){
-    const status=$('inventoryMessage');
-    if(scanner){await closeScanner();status.textContent='Scanner closed.';return}
-    const panel=document.createElement('div');panel.id='perplexQrCamera';panel.style.marginTop='12px';
-    const view=document.createElement('div');view.id='perplexQrView';
-    const close=document.createElement('button');close.type='button';close.className='action secondary';close.textContent='Close scanner';close.onclick=closeScanner;
-    panel.append(view,close);$('inventoryClaimForm').append(panel);
-    status.textContent='Starting camera...';
-    try{
-      await loadLibrary();
-      scanner=new window.Html5Qrcode('perplexQrView');
-      await scanner.start({facingMode:'environment'},{fps:12,disableFlip:true},async scanned=>{
-        if(busy)return;
-        status.textContent='QR detected. Checking Perplex-Mas link...';
-        let token=null;
-        try{
-          const link=new URL(scanned);
-          if(link.origin===location.origin && /(?:^|\/)home\.html$/.test(link.pathname)) token=link.searchParams.get('qr');
-        }catch(e){}
-        if(!token||!/^[A-Za-z0-9_-]{32,128}$/.test(token)){
-          status.textContent='QR detected, but it is not a valid Perplex-Mas item link.';return;
-        }
-        busy=true;await closeScanner();
-        if(!window.confirm('QR item discovered. Unlock for everyone?')){status.textContent='Unlock canceled.';busy=false;return}
-        status.textContent='Unlocking item...';
-        try{
-          const response=await fetch('https://perplex-mas-inventory-api.duckfoolomw.workers.dev/redeem-discovery',{
-            method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({qr_token:token})
-          });
-          const data=await response.json();
-          if(!response.ok)throw new Error(data.error||'Unlock failed');
-          await window.loadSharedInventory();
-          status.textContent=data.newly_unlocked?'QR item unlocked for everyone!':'Item already unlocked.';
-        }catch(e){status.textContent=e.message||'Unable to unlock item.'}
-        busy=false;
-      },()=>{});
-      status.textContent='Point your camera at a Perplex-Mas QR code.';
-    }catch(e){console.error(e);await closeScanner();status.textContent='Camera unavailable. Use your phone camera to scan the QR link.'}
-  }
-  function initializeScannerButton(){
-    const button=$('inventoryScan');
-    if(button)button.onclick=startScanner;
-    const close=$('inventoryClose');
-    if(close)close.addEventListener('click',closeScanner);
-  }
-  if(document.readyState==='loading'){
-    document.addEventListener('DOMContentLoaded',initializeScannerButton,{once:true});
-  }else{
-    initializeScannerButton();
-  }
+  frame=requestAnimationFrame(scan);
+ }catch(e){
+  console.error(e);await closeScanner();
+  status.textContent='Scanner error: '+(e.message||'Unable to start camera.');
+ }
+}
+function init(){
+ $('inventoryScan')?.addEventListener('click',startScanner);
+ $('inventoryClose')?.addEventListener('click',closeScanner);
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});
+else init();
 })();
