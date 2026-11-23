@@ -57,7 +57,7 @@ $('discoveryCreateForm').addEventListener('submit',async e=>{
   if(type==='qr'){
    $('discoveryQrLinkInput').value=link.href;
    if(window.QRCode){
-    new window.QRCode($('discoveryQr'),{text:link.href,width:220,height:220,correctLevel:window.QRCode.CorrectLevel.M});
+    new window.QRCode($('discoveryQr'),{text:link.href,width:320,height:320,correctLevel:window.QRCode.CorrectLevel.L});
    }else{
     status.textContent='QR token created, but QR drawing library did not load. Save the link below.';
    }
