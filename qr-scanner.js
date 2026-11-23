@@ -42,7 +42,7 @@
         if(!window.confirm('QR item discovered. Unlock for everyone?')){status.textContent='Unlock canceled.';busy=false;return}
         status.textContent='Unlocking item...';
         try{
-          const response=await fetch('https://perplex-mas-inventory-api.duckfoolomw.workers.dev/unlock',{
+          const response=await fetch('https://perplex-mas-inventory-api.duckfoolomw.workers.dev/redeem-discovery',{
             method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({qr_token:token})
           });
           const data=await response.json();
