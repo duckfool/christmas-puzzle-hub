@@ -1,4 +1,4 @@
-/* Perplex-Mas QR scanner v13: ZXing decoder diagnostics */
+/* Perplex-Mas QR scanner v14: ZXing decoder diagnostics */
 (function(){
 'use strict';
 const $=id=>document.getElementById(id);
@@ -58,11 +58,33 @@ async function startScanner(){
  const panel=document.createElement('div');panel.id='perplexQrCamera';panel.style.marginTop='12px';
  video=document.createElement('video');video.setAttribute('playsinline','');
  video.muted=true;video.autoplay=true;
- video.style.cssText='width:100%;max-width:480px;border-radius:12px;background:#111;display:block';
+ video.style.cssText='width:100%;height:100%;object-fit:cover;display:block;background:#111';
+ const viewer=document.createElement('div');
+ viewer.style.cssText='position:relative;width:100%;max-width:480px;aspect-ratio:3/4;border-radius:12px;overflow:hidden;background:#111';
+ const overlay=document.createElement('div');
+ overlay.style.cssText='position:absolute;inset:0;pointer-events:none;display:flex;align-items:center;justify-content:center';
+ const guide=document.createElement('div');
+ guide.style.cssText='position:relative;width:76%;aspect-ratio:1;border:2px solid rgba(104,245,170,.22);border-radius:16px;box-shadow:0 0 0 100vmax rgba(0,0,0,.10)';
+ for(const [top,left,border] of [['0','0','border-top:5px solid #68f5aa;border-left:5px solid #68f5aa'],['0','auto','border-top:5px solid #68f5aa;border-right:5px solid #68f5aa'],['auto','0','border-bottom:5px solid #68f5aa;border-left:5px solid #68f5aa'],['auto','auto','border-bottom:5px solid #68f5aa;border-right:5px solid #68f5aa']]){
+  const corner=document.createElement('div');
+  corner.style.cssText='position:absolute;top:'+top+';left:'+left+';right:'+(left==='auto'?'0':'auto')+';bottom:'+(top==='auto'?'0':'auto')+';width:34px;height:34px;'+border+';border-radius:4px';
+  guide.appendChild(corner);
+ }
+ const scanline=document.createElement('div');
+ scanline.style.cssText='position:absolute;left:5%;right:5%;top:10%;height:2px;background:#68f5aa;box-shadow:0 0 12px #68f5aa;animation:perplexScan 2.3s ease-in-out infinite alternate';
+ guide.appendChild(scanline);overlay.appendChild(guide);viewer.append(video,overlay);
+ if(!document.getElementById('perplexScanStyle')){
+  const style=document.createElement('style');style.id='perplexScanStyle';
+  style.textContent='@keyframes perplexScan{from{top:10%}to{top:90%}}';
+  document.head.appendChild(style);
+ }
+ const indicator=document.createElement('div');
+ indicator.style.cssText='margin:8px 0;color:#d9f9e3;font-size:14px';
+ indicator.textContent='● Camera starting…';
  const close=document.createElement('button');close.type='button';close.className='action secondary';close.textContent='Close scanner';
  close.onclick=async()=>{await closeScanner();status.textContent='Scanner closed.'};
- panel.append(video,close);$('inventoryClaimForm').append(panel);
- status.textContent='Loading ZXing scanner v13...';
+ panel.append(indicator,viewer,close);$('inventoryClaimForm').append(panel);
+ status.textContent='Loading ZXing scanner v14...';
  try{
   await loadZXing();
   const hints=new Map();
@@ -77,6 +99,7 @@ async function startScanner(){
    attempts++;
    if(result){
     detected=true;busy=true;
+    indicator.textContent='✓ QR code recognized!';
     status.textContent='QR detected by ZXing!';
     redeem(result.getText());
     return;
@@ -86,10 +109,11 @@ async function startScanner(){
     if(unexpected<=3)console.warn('ZXing scan error',error);
    }
    if(attempts===1||attempts%5===0){
-    status.textContent='ZXing v13: '+attempts+' scans, '+video.videoWidth+'×'+video.videoHeight+', errors: '+unexpected+'.';
+    indicator.textContent='● Searching for QR code… '+attempts+' attempts';
+    status.textContent='ZXing v14: '+attempts+' scans, '+video.videoWidth+'×'+video.videoHeight+', errors: '+unexpected+'.';
    }
   });
-  if(!detected&&attempts===0)status.textContent='ZXing v13 ready; waiting for first scan...';
+  if(!detected&&attempts===0){status.textContent='ZXing v14 ready; waiting for first scan...';indicator.textContent='● Searching for QR code…'}
  }catch(e){console.error(e);await closeScanner();status.textContent='ZXing error: '+(e.message||String(e))}
  finally{starting=false}
 }
