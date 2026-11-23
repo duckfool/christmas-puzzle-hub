@@ -1,34 +1,32 @@
-/* Perplex-Mas scanner using jsQR and direct camera frames. */
+/* Perplex-Mas QR scanner v10: ZXing decoder */
 (function(){
 'use strict';
 const $=id=>document.getElementById(id);
 const API='https://perplex-mas-inventory-api.duckfoolomw.workers.dev';
-let stream=null,video=null,frame=0,active=false,busy=false,detecting=false;
+let reader=null,controls=null,video=null,busy=false,starting=false;
 async function closeScanner(){
- active=false;
- if(frame)cancelAnimationFrame(frame);
- frame=0;
- if(stream){stream.getTracks().forEach(t=>t.stop());stream=null}
- if(video){video.pause();video.srcObject=null;video=null}
+ if(controls){try{controls.stop()}catch(e){}controls=null}
+ if(reader){try{reader.reset()}catch(e){}reader=null}
+ if(video){try{video.pause();video.srcObject=null}catch(e){}video=null}
  $('perplexQrCamera')?.remove();
 }
-function loadDecoder(){
- if(window.jsQR)return Promise.resolve();
- return new Promise((resolve,reject)=>{
-  const s=document.createElement('script');
-  s.src='https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js';
-  s.onload=()=>window.jsQR?resolve():reject(new Error('QR decoder unavailable'));
-  s.onerror=()=>reject(new Error('QR decoder could not load'));
-  document.head.appendChild(s);
+async function loadZXing(){
+ if(window.ZXing?.BrowserQRCodeReader)return;
+ await new Promise((resolve,reject)=>{
+  const script=document.createElement('script');
+  script.src='https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js';
+  script.onload=resolve;
+  script.onerror=()=>reject(Error('ZXing library failed to load'));
+  document.head.appendChild(script);
  });
+ if(!window.ZXing?.BrowserQRCodeReader)throw Error('ZXing decoder not available');
 }
 async function redeem(scanned){
  const status=$('inventoryMessage');
- status.textContent='QR detected. Checking Perplex-Mas link...';
  let token=null;
  try{
   const link=new URL(scanned);
-  if(link.origin===location.origin&&/(?:^|\/)home\.html$/.test(link.pathname))token=link.searchParams.get('qr');
+  if(link.origin===location.origin&&/(?:^|\\/)home\\.html$/.test(link.pathname))token=link.searchParams.get('qr');
  }catch(e){}
  if(!token||!/^[A-Za-z0-9_-]{32,128}$/.test(token)){
   status.textContent='QR detected, but it is not a valid Perplex-Mas item link.';
@@ -52,65 +50,36 @@ async function redeem(scanned){
 }
 async function startScanner(){
  const status=$('inventoryMessage');
- if(active){await closeScanner();status.textContent='Scanner closed.';return}
+ if(starting)return;
+ if(controls){await closeScanner();status.textContent='Scanner closed.';return}
  if(busy)return;
+ starting=true;
  const panel=document.createElement('div');panel.id='perplexQrCamera';panel.style.marginTop='12px';
- video=document.createElement('video');
- video.setAttribute('playsinline','');video.muted=true;video.autoplay=true;
+ video=document.createElement('video');video.setAttribute('playsinline','');
+ video.muted=true;video.autoplay=true;
  video.style.cssText='width:100%;max-width:480px;border-radius:12px;background:#111;display:block';
  const close=document.createElement('button');close.type='button';close.className='action secondary';close.textContent='Close scanner';
- close.onclick=()=>{closeScanner();status.textContent='Scanner closed.'};
+ close.onclick=async()=>{await closeScanner();status.textContent='Scanner closed.'};
  panel.append(video,close);$('inventoryClaimForm').append(panel);
- status.textContent='Starting camera and QR decoder...';
+ status.textContent='Loading ZXing scanner v10...';
  try{
-  await loadDecoder();
-  stream=await navigator.mediaDevices.getUserMedia({
-   audio:false,video:{facingMode:{ideal:'environment'},width:{ideal:1280},height:{ideal:720}}
+  await loadZXing();
+  reader=new window.ZXing.BrowserQRCodeReader();
+  const devices=await window.ZXing.BrowserCodeReader.listVideoInputDevices();
+  const rear=devices.find(d=>/back|rear|environment/i.test(d.label));
+  status.textContent='Starting ZXing camera...';
+  controls=await reader.decodeFromVideoDevice(rear?.deviceId||undefined,video,(result,error)=>{
+   if(busy||!result)return;
+   busy=true;
+   status.textContent='QR detected by ZXing!';
+   redeem(result.getText());
   });
-  video.srcObject=stream;
-  await video.play();
-  active=true;
-  status.textContent='Point your camera at a Perplex-Mas QR code (new scanner).';
-  const canvas=document.createElement('canvas');
-  const ctx=canvas.getContext('2d',{willReadFrequently:true});
-  let last=0,frames=0,errors=0,ticks=0;
-  let nativeDetector=null;
-  if('BarcodeDetector' in window){try{nativeDetector=new BarcodeDetector({formats:['qr_code']})}catch(e){console.warn('Native QR detector unavailable',e)}}
-  async function scan(now){
-   if(!active)return;
-   ticks++;
-   if(ticks===1)status.textContent='Scanner v9: camera loop started.';
-   frame=requestAnimationFrame(scan);
-   if(busy||detecting||now-last<120||video.readyState<2)return;
-   last=now;detecting=true;
-   try{
-    const w=video.videoWidth,h=video.videoHeight;
-    if(!w||!h)return;
-    canvas.width=w;canvas.height=h;
-    ctx.drawImage(video,0,0,canvas.width,canvas.height);
-    frames++;
-    if(nativeDetector){
-     try{
-      const codes=await nativeDetector.detect(video);
-      if(codes.length&&codes[0].rawValue){busy=true;await redeem(codes[0].rawValue);return}
-     }catch(e){nativeDetector=null;console.warn('Native QR detection failed; using jsQR',e)}
-    }
-    if(!active||busy)return;
-    const pixels=ctx.getImageData(0,0,canvas.width,canvas.height);
-    status.textContent='Scanner v9: '+frames+' frames checked ('+canvas.width+'×'+canvas.height+'), '+(nativeDetector?'native + jsQR':'jsQR')+', errors: '+errors+'.';
-    const result=window.jsQR(pixels.data,canvas.width,canvas.height,{inversionAttempts:'attemptBoth'});
-    if(result?.data){busy=true;await redeem(result.data)}
-   }catch(e){errors++;console.error('QR frame scan:',e);status.textContent='QR processing error: '+(e.message||String(e))}
-   finally{detecting=false}
-  }
-  frame=requestAnimationFrame(scan);
- }catch(e){
-  console.error(e);await closeScanner();
-  status.textContent='Scanner error: '+(e.message||'Unable to start camera.');
- }
+  status.textContent='ZXing v10 ready. Point camera at QR code.';
+ }catch(e){console.error(e);await closeScanner();status.textContent='ZXing error: '+(e.message||String(e))}
+ finally{starting=false}
 }
 function init(){
- $('inventoryScan')?.addEventListener('click',startScanner);
+ const button=$('inventoryScan');if(button)button.onclick=startScanner;
  $('inventoryClose')?.addEventListener('click',closeScanner);
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});
