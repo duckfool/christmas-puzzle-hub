@@ -1,4 +1,4 @@
-/* Perplex-Mas QR scanner v12: ZXing decoder diagnostics */
+/* Perplex-Mas QR scanner v13: ZXing decoder diagnostics */
 (function(){
 'use strict';
 const $=id=>document.getElementById(id);
@@ -62,18 +62,17 @@ async function startScanner(){
  const close=document.createElement('button');close.type='button';close.className='action secondary';close.textContent='Close scanner';
  close.onclick=async()=>{await closeScanner();status.textContent='Scanner closed.'};
  panel.append(video,close);$('inventoryClaimForm').append(panel);
- status.textContent='Loading ZXing scanner v12...';
+ status.textContent='Loading ZXing scanner v13...';
  try{
   await loadZXing();
   const hints=new Map();
   hints.set(window.ZXing.DecodeHintType.TRY_HARDER,true);
   reader=new window.ZXing.BrowserQRCodeReader(300,hints);
-  const devices=await reader.listVideoInputDevices();
-  const rear=devices.find(d=>/back|rear|environment/i.test(d.label));
+  const constraints={audio:false,video:{facingMode:{ideal:'environment'},width:{ideal:1920},height:{ideal:1080}}};
   status.textContent='Starting ZXing camera...';
   active=true;
   let attempts=0,unexpected=0,detected=false;
-  controls=await reader.decodeFromVideoDevice(rear?.deviceId||undefined,video,(result,error)=>{
+  controls=await reader.decodeFromConstraints(constraints,video,(result,error)=>{
    if(!active||busy)return;
    attempts++;
    if(result){
@@ -87,10 +86,10 @@ async function startScanner(){
     if(unexpected<=3)console.warn('ZXing scan error',error);
    }
    if(attempts===1||attempts%5===0){
-    status.textContent='ZXing v12: '+attempts+' scans, '+video.videoWidth+'×'+video.videoHeight+', errors: '+unexpected+'.';
+    status.textContent='ZXing v13: '+attempts+' scans, '+video.videoWidth+'×'+video.videoHeight+', errors: '+unexpected+'.';
    }
   });
-  if(!detected&&attempts===0)status.textContent='ZXing v12 ready; waiting for first scan...';
+  if(!detected&&attempts===0)status.textContent='ZXing v13 ready; waiting for first scan...';
  }catch(e){console.error(e);await closeScanner();status.textContent='ZXing error: '+(e.message||String(e))}
  finally{starting=false}
 }
