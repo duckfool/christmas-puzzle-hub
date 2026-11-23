@@ -5,6 +5,16 @@ const KEY='perplex-mas-admin-token';
 const $=id=>document.getElementById(id);
 const status=$('discoveryStatus'), list=$('discoveryList'), select=$('discoveryItem');
 function headers(){return {Authorization:'Bearer '+sessionStorage.getItem(KEY)}}
+function discoveryLink(token){
+ const link=new URL('r.html',location.href);
+ let compact=token;
+ if(/^[0-9a-f]{64}$/i.test(token)){
+  const bytes=token.match(/../g).map(h=>String.fromCharCode(parseInt(h,16))).join('');
+  compact='h_'+btoa(bytes).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+ }
+ link.searchParams.set('q',compact);
+ return link;
+}
 async function json(response){const data=await response.json();if(!response.ok)throw Error(data.error||'Request failed');return data}
 async function refresh(){
  status.textContent='Loading discoveries...';
@@ -40,8 +50,7 @@ async function refresh(){
      $('discoveryQr').hidden=!isQr;
      $('discoveryQrDownload').hidden=!isQr;
      if(isQr){
-      const link=new URL('home.html',location.href);
-      link.searchParams.set('qr',token);
+      const link=discoveryLink(token);
       $('discoveryQrLinkInput').value=link.href;
       if(window.QRCode){
        new window.QRCode($('discoveryQr'),{text:link.href,width:320,height:320,correctLevel:window.QRCode.CorrectLevel.L});
@@ -97,8 +106,7 @@ $('discoveryCreateForm').addEventListener('submit',async e=>{
    body:JSON.stringify({item_id:select.value,type})
   }).then(json);
   const token=data.token;
-  const link=new URL('home.html',location.href);
-  link.searchParams.set('qr',token);
+  const link=discoveryLink(token);
   $('discoveryToken').textContent=token;
   $('discoveryCodeLabel').textContent=type==='qr'?'QR token':'Access code';
   $('discoveryQr').replaceChildren();
