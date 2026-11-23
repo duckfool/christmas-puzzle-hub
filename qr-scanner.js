@@ -1,4 +1,4 @@
-/* Perplex-Mas QR scanner v10: ZXing decoder */
+/* Perplex-Mas QR scanner v12: ZXing decoder diagnostics */
 (function(){
 'use strict';
 const $=id=>document.getElementById(id);
@@ -62,21 +62,35 @@ async function startScanner(){
  const close=document.createElement('button');close.type='button';close.className='action secondary';close.textContent='Close scanner';
  close.onclick=async()=>{await closeScanner();status.textContent='Scanner closed.'};
  panel.append(video,close);$('inventoryClaimForm').append(panel);
- status.textContent='Loading ZXing scanner v10...';
+ status.textContent='Loading ZXing scanner v12...';
  try{
   await loadZXing();
-  reader=new window.ZXing.BrowserQRCodeReader();
+  const hints=new Map();
+  hints.set(window.ZXing.DecodeHintType.TRY_HARDER,true);
+  reader=new window.ZXing.BrowserQRCodeReader(300,hints);
   const devices=await reader.listVideoInputDevices();
   const rear=devices.find(d=>/back|rear|environment/i.test(d.label));
   status.textContent='Starting ZXing camera...';
   active=true;
+  let attempts=0,unexpected=0,detected=false;
   controls=await reader.decodeFromVideoDevice(rear?.deviceId||undefined,video,(result,error)=>{
-   if(busy||!result)return;
-   busy=true;
-   status.textContent='QR detected by ZXing!';
-   redeem(result.getText());
+   if(!active||busy)return;
+   attempts++;
+   if(result){
+    detected=true;busy=true;
+    status.textContent='QR detected by ZXing!';
+    redeem(result.getText());
+    return;
+   }
+   if(error&&!(error instanceof window.ZXing.NotFoundException)){
+    unexpected++;
+    if(unexpected<=3)console.warn('ZXing scan error',error);
+   }
+   if(attempts===1||attempts%5===0){
+    status.textContent='ZXing v12: '+attempts+' scans, '+video.videoWidth+'×'+video.videoHeight+', errors: '+unexpected+'.';
+   }
   });
-  status.textContent='ZXing v10 ready. Point camera at QR code.';
+  if(!detected&&attempts===0)status.textContent='ZXing v12 ready; waiting for first scan...';
  }catch(e){console.error(e);await closeScanner();status.textContent='ZXing error: '+(e.message||String(e))}
  finally{starting=false}
 }
