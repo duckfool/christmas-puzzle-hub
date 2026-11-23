@@ -23,6 +23,37 @@ async function refresh(){
    const label=document.createElement('strong');label.textContent=(discovery.item_name||discovery.item_id)+' · '+(discovery.type==='qr'?'QR code':'6-digit code');
    const detail=document.createElement('span');detail.textContent=' #'+discovery.id+' · '+(discovery.redeemed_at?'Redeemed '+discovery.redeemed_at:'Not redeemed');
    row.append(label,detail);
+   const view=document.createElement('button');
+   view.type='button';
+   view.textContent=discovery.type==='qr'?'View QR':'View Code';
+   view.addEventListener('click',async()=>{
+    view.disabled=true;
+    status.textContent='Retrieving discovery #'+discovery.id+'...';
+    try{
+     const data=await fetch(BASE+'/admin/discoveries/token?id='+encodeURIComponent(discovery.id),{headers:headers(),cache:'no-store'}).then(json);
+     const token=data.token;
+     $('discoveryToken').textContent=token;
+     $('discoveryCodeLabel').textContent=discovery.type==='qr'?'Saved QR token':'Saved access code';
+     $('discoveryQr').replaceChildren();
+     const isQr=discovery.type==='qr';
+     $('discoveryQrLink').hidden=!isQr;
+     $('discoveryQr').hidden=!isQr;
+     $('discoveryQrDownload').hidden=!isQr;
+     if(isQr){
+      const link=new URL('home.html',location.href);
+      link.searchParams.set('qr',token);
+      $('discoveryQrLinkInput').value=link.href;
+      if(window.QRCode){
+       new window.QRCode($('discoveryQr'),{text:link.href,width:320,height:320,correctLevel:window.QRCode.CorrectLevel.L});
+      }else{throw Error('QR drawing library did not load. You can still copy the QR link.')}
+     }
+     $('discoveryResult').hidden=false;
+     $('discoveryResult').scrollIntoView({behavior:'smooth',block:'center'});
+     status.textContent='Discovery #'+discovery.id+' loaded. Keep its token private.';
+    }catch(e){status.textContent=e.message}
+    finally{view.disabled=false}
+   });
+   row.append(view);
    if(!discovery.redeemed_at){
     const revoke=document.createElement('button');
     revoke.type='button';revoke.textContent='Revoke';
@@ -45,7 +76,7 @@ async function refresh(){
    list.append(row);
   }
   if(!list.children.length)list.textContent='No discoveries registered yet.';
-  status.textContent=(discoveries.discoveries||[]).length+' registered discoveries. Original codes are shown only when generated.';
+  status.textContent=(discoveries.discoveries||[]).length+' registered discoveries. Select View Code or View QR to reopen encrypted discoveries.';
  }catch(e){status.textContent=e.message}
 }
 function downloadQr(){
@@ -69,7 +100,7 @@ $('discoveryCreateForm').addEventListener('submit',async e=>{
   const link=new URL('home.html',location.href);
   link.searchParams.set('qr',token);
   $('discoveryToken').textContent=token;
-  $('discoveryCodeLabel').textContent=type==='qr'?'QR token (save now)':'Access code (save now)';
+  $('discoveryCodeLabel').textContent=type==='qr'?'QR token':'Access code';
   $('discoveryQr').replaceChildren();
   $('discoveryQrLink').hidden=type!=='qr';
   $('discoveryQr').hidden=type!=='qr';
@@ -84,7 +115,7 @@ $('discoveryCreateForm').addEventListener('submit',async e=>{
   }
   $('discoveryResult').hidden=false;
   await refresh();
-  status.textContent='Discovery created. Copy the code or QR link now; it cannot be retrieved later.';
+  status.textContent='Discovery created. You can reopen it from the discovery list.';
  }catch(err){status.textContent=err.message}
  finally{button.disabled=false}
 });
