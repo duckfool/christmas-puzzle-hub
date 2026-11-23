@@ -1,0 +1,16 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Perplex-Mas Discovery</title></head><body><p>Opening Perplex-Mas discovery…</p><script>
+(function(){
+ const q=new URLSearchParams(location.search).get('q');
+ if(!q||!/^[A-Za-z0-9_-]{20,128}$/.test(q)){document.body.textContent='Invalid discovery link.';return}
+ let token=q;
+ if(q.startsWith('h_')){
+  try{
+   const raw=q.slice(2).replace(/-/g,'+').replace(/_/g,'/');
+   const bytes=atob(raw.padEnd(Math.ceil(raw.length/4)*4,'='));
+   token=Array.from(bytes,c=>c.charCodeAt(0).toString(16).padStart(2,'0')).join('');
+  }catch(e){document.body.textContent='Invalid discovery link.';return}
+ }
+ if(!/^[A-Za-z0-9_-]{32,128}$/.test(token)){document.body.textContent='Invalid discovery link.';return}
+ location.replace('home.html?qr='+encodeURIComponent(token));
+})();
+</script></body></html>
