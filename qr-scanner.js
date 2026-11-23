@@ -33,7 +33,7 @@
         let token=null;
         try{
           const link=new URL(scanned);
-          if(link.origin===location.origin&&link.pathname===location.pathname)token=link.searchParams.get('qr');
+          if(link.origin===location.origin && /(?:^|\/)home\.html$/.test(link.pathname)) token=link.searchParams.get('qr');
         }catch(e){}
         if(!token||!/^[A-Za-z0-9_-]{32,128}$/.test(token)){
           status.textContent='Scan a Perplex-Mas item QR code.';return;
