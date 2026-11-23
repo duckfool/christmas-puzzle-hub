@@ -52,9 +52,10 @@ $('discoveryCreateForm').addEventListener('submit',async e=>{
   $('discoveryCodeLabel').textContent=type==='qr'?'QR token (save now)':'Access code (save now)';
   $('discoveryQr').replaceChildren();
   $('discoveryQrLink').hidden=type!=='qr';
+  $('discoveryQr').hidden=type!=='qr';
   $('discoveryQrDownload').hidden=type!=='qr';
   if(type==='qr'){
-   $('discoveryQrLink').value=link.href;
+   $('discoveryQrLinkInput').value=link.href;
    if(window.QRCode){
     new window.QRCode($('discoveryQr'),{text:link.href,width:220,height:220,correctLevel:window.QRCode.CorrectLevel.M});
    }else{
@@ -68,7 +69,7 @@ $('discoveryCreateForm').addEventListener('submit',async e=>{
  finally{button.disabled=false}
 });
 $('discoveryCopyToken').onclick=async()=>{try{await navigator.clipboard.writeText($('discoveryToken').textContent);status.textContent='Token copied.'}catch(e){status.textContent='Select and copy the token manually.'}};
-$('discoveryCopyLink').onclick=async()=>{try{await navigator.clipboard.writeText($('discoveryQrLink').value);status.textContent='QR link copied.'}catch(e){status.textContent='Select and copy the link manually.'}};
+$('discoveryCopyLink').onclick=async()=>{try{await navigator.clipboard.writeText($('discoveryQrLinkInput').value);status.textContent='QR link copied.'}catch(e){status.textContent='Select and copy the link manually.'}};
 $('discoveryQrDownload').onclick=downloadQr;
 $('discoveryRefresh').onclick=refresh;
 document.addEventListener('perplex-admin-ready',refresh);
