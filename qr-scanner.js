@@ -28,15 +28,16 @@
     try{
       await loadLibrary();
       scanner=new window.Html5Qrcode('perplexQrView');
-      await scanner.start({facingMode:'environment'},{fps:8,qrbox:{width:220,height:220}},async scanned=>{
+      await scanner.start({facingMode:'environment'},{fps:12,disableFlip:true},async scanned=>{
         if(busy)return;
+        status.textContent='QR detected. Checking Perplex-Mas link...';
         let token=null;
         try{
           const link=new URL(scanned);
           if(link.origin===location.origin && /(?:^|\/)home\.html$/.test(link.pathname)) token=link.searchParams.get('qr');
         }catch(e){}
         if(!token||!/^[A-Za-z0-9_-]{32,128}$/.test(token)){
-          status.textContent='Scan a Perplex-Mas item QR code.';return;
+          status.textContent='QR detected, but it is not a valid Perplex-Mas item link.';return;
         }
         busy=true;await closeScanner();
         if(!window.confirm('QR item discovered. Unlock for everyone?')){status.textContent='Unlock canceled.';busy=false;return}
