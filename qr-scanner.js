@@ -73,9 +73,11 @@ async function startScanner(){
   status.textContent='Point your camera at a Perplex-Mas QR code (new scanner).';
   const canvas=document.createElement('canvas');
   const ctx=canvas.getContext('2d',{willReadFrequently:true});
-  let last=0,frames=0,errors=0;
+  let last=0,frames=0,errors=0,ticks=0;
   function scan(now){
    if(!active)return;
+   ticks++;
+   if(ticks===1)status.textContent='Diagnostic v8: camera loop started.';
    frame=requestAnimationFrame(scan);
    if(busy||detecting||now-last<120||video.readyState<2)return;
    last=now;detecting=true;
@@ -87,7 +89,7 @@ async function startScanner(){
     ctx.drawImage(video,0,0,canvas.width,canvas.height);
     const pixels=ctx.getImageData(0,0,canvas.width,canvas.height);
     frames++;
-    if(frames%20===0)status.textContent='Scanner running: '+frames+' frames checked ('+canvas.width+'×'+canvas.height+'), errors: '+errors+'.';
+    status.textContent='Diagnostic v8: '+frames+' frames checked ('+canvas.width+'×'+canvas.height+'), errors: '+errors+'.';
     const result=window.jsQR(pixels.data,canvas.width,canvas.height,{inversionAttempts:'attemptBoth'});
     if(result?.data){busy=true;redeem(result.data)}
    }catch(e){errors++;console.error('QR frame scan:',e);status.textContent='QR processing error: '+(e.message||String(e))}
