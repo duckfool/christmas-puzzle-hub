@@ -66,7 +66,7 @@ async function startScanner(){
  try{
   await loadZXing();
   reader=new window.ZXing.BrowserQRCodeReader();
-  const devices=await window.ZXing.BrowserCodeReader.listVideoInputDevices();
+  const devices=await reader.listVideoInputDevices();
   const rear=devices.find(d=>/back|rear|environment/i.test(d.label));
   status.textContent='Starting ZXing camera...';
   active=true;
