@@ -3,9 +3,10 @@
 'use strict';
 const $=id=>document.getElementById(id);
 const API='https://perplex-mas-inventory-api.duckfoolomw.workers.dev';
-let reader=null,controls=null,video=null,busy=false,starting=false;
+let reader=null,controls=null,video=null,busy=false,starting=false,active=false;
 async function closeScanner(){
  if(controls){try{controls.stop()}catch(e){}controls=null}
+ active=false;
  if(reader){try{reader.reset()}catch(e){}reader=null}
  if(video){try{video.pause();video.srcObject=null}catch(e){}video=null}
  $('perplexQrCamera')?.remove();
@@ -51,7 +52,7 @@ async function redeem(scanned){
 async function startScanner(){
  const status=$('inventoryMessage');
  if(starting)return;
- if(controls){await closeScanner();status.textContent='Scanner closed.';return}
+ if(active){await closeScanner();status.textContent='Scanner closed.';return}
  if(busy)return;
  starting=true;
  const panel=document.createElement('div');panel.id='perplexQrCamera';panel.style.marginTop='12px';
@@ -68,6 +69,7 @@ async function startScanner(){
   const devices=await window.ZXing.BrowserCodeReader.listVideoInputDevices();
   const rear=devices.find(d=>/back|rear|environment/i.test(d.label));
   status.textContent='Starting ZXing camera...';
+  active=true;
   controls=await reader.decodeFromVideoDevice(rear?.deviceId||undefined,video,(result,error)=>{
    if(busy||!result)return;
    busy=true;
