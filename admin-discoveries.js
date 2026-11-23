@@ -22,7 +22,27 @@ async function refresh(){
    const row=document.createElement('div');row.className='discovery-row';
    const label=document.createElement('strong');label.textContent=(discovery.item_name||discovery.item_id)+' · '+(discovery.type==='qr'?'QR code':'6-digit code');
    const detail=document.createElement('span');detail.textContent=' #'+discovery.id+' · '+(discovery.redeemed_at?'Redeemed '+discovery.redeemed_at:'Not redeemed');
-   row.append(label,detail);list.append(row);
+   row.append(label,detail);
+   if(!discovery.redeemed_at){
+    const revoke=document.createElement('button');
+    revoke.type='button';revoke.textContent='Revoke';
+    revoke.style.background='#e5a7a0';
+    revoke.addEventListener('click',async()=>{
+     if(!window.confirm('Revoke this unused '+(discovery.type==='qr'?'QR code':'access code')+' for '+(discovery.item_name||discovery.item_id)+'? This cannot be undone.'))return;
+     revoke.disabled=true;status.textContent='Revoking discovery #'+discovery.id+'...';
+     try{
+      await fetch(BASE+'/admin/discoveries',{
+       method:'DELETE',
+       headers:{...headers(),'Content-Type':'application/json'},
+       body:JSON.stringify({id:discovery.id})
+      }).then(json);
+      await refresh();
+      status.textContent='Discovery #'+discovery.id+' revoked. Shared inventory was not changed.';
+     }catch(e){status.textContent=e.message;revoke.disabled=false}
+    });
+    row.append(revoke);
+   }
+   list.append(row);
   }
   if(!list.children.length)list.textContent='No discoveries registered yet.';
   status.textContent=(discoveries.discoveries||[]).length+' registered discoveries. Original codes are shown only when generated.';
