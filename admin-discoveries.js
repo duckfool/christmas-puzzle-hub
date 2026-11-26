@@ -95,6 +95,13 @@ function downloadQr(){
  if(!src)return;
  const link=document.createElement('a');link.href=src;link.download='perplex-mas-discovery-qr.png';link.click();
 }
+const customWrap=document.createElement('div');
+const customLabel=document.createElement('label');customLabel.htmlFor='customDiscoveryCode';customLabel.textContent='Custom access code (optional)';
+const customInput=document.createElement('input');customInput.id='customDiscoveryCode';customInput.type='text';customInput.inputMode='numeric';customInput.maxLength=6;customInput.pattern='[0-9]{6}';customInput.placeholder='Leave blank for random code';customInput.autocomplete='off';
+customWrap.append(customLabel,customInput);
+$('discoveryCreateButton').before(customWrap);
+function syncCustomCode(){const isCode=$('discoveryType').value==='code';customWrap.hidden=!isCode;customInput.disabled=!isCode;}
+$('discoveryType').addEventListener('change',syncCustomCode);syncCustomCode();
 $('discoveryCreateForm').addEventListener('submit',async e=>{
  e.preventDefault();
  const button=$('discoveryCreateButton');button.disabled=true;status.textContent='Generating discovery...';
@@ -103,7 +110,7 @@ $('discoveryCreateForm').addEventListener('submit',async e=>{
   const type=$('discoveryType').value;
   const data=await fetch(BASE+'/admin/discoveries',{
    method:'POST',headers:{...headers(),'Content-Type':'application/json'},
-   body:JSON.stringify({item_id:select.value,type})
+   body:JSON.stringify({item_id:select.value,type,...(type==='code'&&customInput.value!==''?{custom_code:customInput.value}:{})})
   }).then(json);
   const token=data.token;
   const link=discoveryLink(token);
@@ -122,8 +129,10 @@ $('discoveryCreateForm').addEventListener('submit',async e=>{
    }
   }
   $('discoveryResult').hidden=false;
+  const mismatch=type==='code'&&customInput.value!==''&&token!==customInput.value;
+  if(!mismatch)customInput.value='';
   await refresh();
-  status.textContent='Discovery created. You can reopen it from the discovery list.';
+  status.textContent=mismatch?'Warning: Worker returned a different code. Check the deployment and revoke the unwanted discovery if needed.':'Discovery created. You can reopen it from the discovery list.';
  }catch(err){status.textContent=err.message}
  finally{button.disabled=false}
 });
